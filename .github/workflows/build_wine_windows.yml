@@ -69,7 +69,33 @@ jobs:
       - name: Install Windows SDK 10.0.22000
         shell: pwsh
         run: |
-          choco install windows-sdk-11-version-22H2-all -y --no-progress
+          $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
+
+          & $installer modify `
+            --installPath "C:\Program Files\Microsoft Visual Studio\2022\Enterprise" `
+            --add Microsoft.VisualStudio.Component.Windows11SDK.22000 `
+            --quiet `
+            --norestart `
+            --nocache
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Visual Studio Installer failed with exit code $LASTEXITCODE"
+          }
+
+      - name: Verify Windows SDK
+        shell: pwsh
+        run: |
+          $sdk = "C:\Program Files (x86)\Windows Kits\10\Include\10.0.22000.0"
+
+          if (-not (Test-Path $sdk)) {
+            Write-Host "Installed SDK versions:"
+            Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Include" |
+              Select-Object -ExpandProperty Name
+
+            throw "Windows SDK 10.0.22000.0 is still missing"
+          }
+
+          Write-Host "Windows SDK 10.0.22000.0 found"
 
       - name: Compile
         shell: bash
