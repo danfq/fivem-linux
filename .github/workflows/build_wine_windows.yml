@@ -27,6 +27,22 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Force node-gyp to Python 3.11
+        shell: pwsh
+        run: |
+          $python = (Get-Command python).Source
+
+          echo "PYTHON=$python" >> $env:GITHUB_ENV
+          echo "npm_config_python=$python" >> $env:GITHUB_ENV
+
+          python -m pip install --upgrade pip
+          python -m pip install setuptools
+
       - name: Build FiveM client
         shell: pwsh
         run: |
