@@ -53,15 +53,8 @@ jobs:
         run: |
           cd "$ROOT_REPO"
 
-          chmod +x .github/workflows/ci/build_windows.sh
+          BUILD_SCRIPT=".github/workflows/ci/build_windows.sh"
+          PLATFORM=
 
-          .github/workflows/ci/build_windows.sh \
-            "$ROOT_DEP" \
-            "$JOB_SLOTS"
-
-      - name: Upload build
-        uses: actions/upload-artifact@v4
-        with:
-          name: fivem-patched
-          path: C:\b\five\code\bin\five\
-          if-no-files-found: error
+          chmod +x "$BUILD_SCRIPT"
+          "$BUILD_SCRIPT" "$ROOT_DEP" "$JOB_SLOTS"
