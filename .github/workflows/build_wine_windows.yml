@@ -48,11 +48,35 @@ jobs:
         run: |
           mkdir -p "$ROOT_DEP"
 
+            - name: Setup Python
+              uses: actions/setup-python@v5
+              with:
+                python-version: "3.11"
+
+            - name: Install Python compatibility
+              shell: pwsh
+              run: |
+                python -m pip install --upgrade pip
+                python -m pip install setuptools
+
+            - name: Configure node-gyp Python
+              shell: pwsh
+              run: |
+                $python = (Get-Command python).Source
+                echo "PYTHON=$python" >> $env:GITHUB_ENV
+                echo "npm_config_python=$python" >> $env:GITHUB_ENV
+
+            - name: Install Windows SDK 10.0.22000
+              shell: pwsh
+              run: |
+                choco install windows-sdk-11-version-22H2-all -y --no-progress
+
       - name: Compile
         shell: bash
         run: |
           cd "$ROOT_REPO"
 
+          # unset platform to avoid collisions
           BUILD_SCRIPT=".github/workflows/ci/build_windows.sh"
           PLATFORM=
 
