@@ -5,115 +5,34 @@ on:
 
 permissions:
   contents: read
-  packages: read
 
 jobs:
   build:
-    name: FiveM
     runs-on: windows-2022
 
     env:
-      PROGRAM: five
-      PLATFORM: windows
+      CFX_PRODUCT_NAME: fivem
+      CFX_DRY_RUN: "true"
+      CFX_RETAIL_BUILD: "false"
 
     steps:
       - name: Checkout
-        shell: bash
-        run: |
-          ROOT="C:\b"
-          ROOT_REPO="$ROOT/$PROGRAM"
-          ROOT_DEP="$ROOT/dep"
-          JOB_SLOTS=$(nproc --all)
-
-          echo "ROOT_REPO=$ROOT_REPO" >> "$GITHUB_ENV"
-          echo "ROOT_DEP=$ROOT_DEP" >> "$GITHUB_ENV"
-          echo "JOB_SLOTS=$JOB_SLOTS" >> "$GITHUB_ENV"
-
-          mkdir -p "$ROOT_REPO"
-          cd "$ROOT_REPO"
-
-          git init .
-          git config core.symlinks true
-          git remote add origin "${{ github.server_url }}/${{ github.repository }}.git"
-          git fetch origin "${{ github.sha }}" --depth=1
-          git checkout FETCH_HEAD
-
-          git submodule update \
-            --jobs="$JOB_SLOTS" \
-            --init \
-            --depth=1
-
-      - name: Dependencies
-        shell: bash
-        run: |
-          mkdir -p "$ROOT_DEP"
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/checkout@v4
         with:
-          python-version: "3.11"
+          submodules: recursive
+          fetch-depth: 1
 
-      - name: Install Python compatibility
+      - name: Build FiveM client
         shell: pwsh
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install setuptools
+          .\code\tools\ci\build_client.ps1
 
-      - name: Configure node-gyp Python
-        shell: pwsh
-        run: |
-          $python = (Get-Command python).Source
-          echo "PYTHON=$python" >> $env:GITHUB_ENV
-          echo "npm_config_python=$python" >> $env:GITHUB_ENV
-
-      - name: Install Windows SDK 10.0.22000.0
-        shell: pwsh
-        run: |
-          $url = "https://download.microsoft.com/download/d/8/f/d8ff148b-450c-40b3-aeed-2a3944e66bbd/windowssdk/winsdksetup.exe"
-          $installer = "$env:TEMP\winsdk22000.exe"
-          $expected = "4D73DDC82CAA1CBE82DFFDC24B7CEF368919E077BAD984357D447568FEAB1F5F"
-
-          Invoke-WebRequest -Uri $url -OutFile $installer
-
-          $actual = (Get-FileHash $installer -Algorithm SHA256).Hash
-
-          if ($actual -ne $expected) {
-            throw "SDK installer hash mismatch. Expected $expected, got $actual"
-          }
-
-          $process = Start-Process `
-            -FilePath $installer `
-            -ArgumentList '/Features + /Quiet /NoRestart' `
-            -Wait `
-            -PassThru
-
-          if ($process.ExitCode -ne 0 -and $process.ExitCode -ne 3010) {
-            throw "Windows SDK installer failed with exit code $($process.ExitCode)"
-          }
-
-      - name: Verify Windows SDK 10.0.22000.0
-        shell: pwsh
-        run: |
-          $sdk = "C:\Program Files (x86)\Windows Kits\10\Include\10.0.22000.0"
-
-          Write-Host "Installed SDK versions:"
-          Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Include" |
-            Select-Object -ExpandProperty Name
-
-          if (-not (Test-Path $sdk)) {
-            throw "Windows SDK 10.0.22000.0 is still missing"
-          }
-
-          Write-Host "Windows SDK 10.0.22000.0 found"
-
-      - name: Compile
-        shell: bash
-        run: |
-          cd "$ROOT_REPO"
-
-          # unset platform to avoid collisions
-          BUILD_SCRIPT=".github/workflows/ci/build_windows.sh"
-          PLATFORM=
-
-          chmod +x "$BUILD_SCRIPT"
-          "$BUILD_SCRIPT" "$ROOT_DEP" "$JOB_SLOTS"
+      - name: Upload caches
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fivem-build-output
+          path: |
+            caches/**
+            .build-cache/**
+            code/bin/**
