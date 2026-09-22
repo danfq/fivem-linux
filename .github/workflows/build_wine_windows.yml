@@ -43,37 +43,60 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install setuptools
 
-      - name: Install Windows 10 SDK 22000
+      - name: Install Windows 11 SDK 22000
         shell: pwsh
         run: |
-          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $ErrorActionPreference = 'Stop'
+          $sdkVersion = '10.0.22000.0'
+          $sdkComponent = 'Microsoft.VisualStudio.Component.Windows11SDK.22000'
+          $vsInstallerDir = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer"
+          $vswhere = Join-Path $vsInstallerDir 'vswhere.exe'
+          $installer = Join-Path $vsInstallerDir 'setup.exe'
 
-          $installationPath = & $vswhere `
-            -latest `
-            -products * `
+          if (-not (Test-Path $vswhere)) {
+            throw "Visual Studio Installer discovery tool was not found: $vswhere"
+          }
+
+          if (-not (Test-Path $installer)) {
+            throw "Visual Studio Installer was not found: $installer"
+          }
+
+          $installationPath = (& $vswhere -latest -products * `
             -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
-            -property installationPath
+            -property installationPath | Select-Object -First 1).Trim()
 
           if (-not $installationPath) {
-            throw "Visual Studio installation was not found"
+            throw "A Visual Studio installation with C++ tools was not found"
           }
 
-          $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe"
+          $sdkRoot = 'C:\Program Files (x86)\Windows Kits\10'
+          $sdkLib = Join-Path $sdkRoot "Lib\$sdkVersion"
+          $sdkInclude = Join-Path $sdkRoot "Include\$sdkVersion\um\Windows.h"
 
-          & $installer modify `
-            --installPath "$installationPath" `
-            --add Microsoft.VisualStudio.Component.Windows11SDK.22000 `
-            --quiet `
-            --wait `
-            --norestart
+          if (-not ((Test-Path $sdkLib) -and (Test-Path $sdkInclude))) {
+            Write-Host "Installing $sdkComponent into $installationPath"
 
-          if ($LASTEXITCODE -ne 0) {
-            throw "Windows SDK installation failed with exit code $LASTEXITCODE"
+            $process = Start-Process -FilePath $installer `
+              -ArgumentList @(
+                'modify'
+                '--installPath', $installationPath
+                '--add', $sdkComponent
+                '--quiet'
+                '--norestart'
+              ) `
+              -Wait `
+              -PassThru
+
+            if ($process.ExitCode -notin @(0, 3010)) {
+              throw "Windows SDK installation failed with exit code $($process.ExitCode)"
+            }
           }
 
-          if (-not (Test-Path "C:\Program Files (x86)\Windows Kits\10\Lib\10.0.22000.0")) {
-            throw "Windows SDK 10.0.22000.0 was not installed"
+          if (-not ((Test-Path $sdkLib) -and (Test-Path $sdkInclude))) {
+            throw "Windows SDK $sdkVersion is unavailable after installation. Expected '$sdkLib' and '$sdkInclude'."
           }
+
+          Write-Host "Verified Windows SDK $sdkVersion at $sdkRoot"
 
       - name: Build FiveM client
         shell: pwsh
