@@ -54,8 +54,8 @@ jobs:
 
           $sdkVersions = Get-ChildItem $sdkLibRoot -Directory |
             Where-Object {
-              Test-Path (Join-Path $_.FullName 'um\WindowsApp.lib') -and
-              Test-Path (Join-Path $sdkIncludeRoot "$($_.Name)\um\Windows.h")
+              (Test-Path (Join-Path $_.FullName 'um\WindowsApp.lib')) -and
+              (Test-Path (Join-Path $sdkIncludeRoot "$($_.Name)\um\Windows.h"))
             } |
             Sort-Object {
               try { [version]$_.Name }
