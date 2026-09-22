@@ -43,6 +43,38 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install setuptools
 
+            - name: Install Windows 10 SDK 22000
+              shell: pwsh
+              run: |
+                $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+
+                $installationPath = & $vswhere `
+                  -latest `
+                  -products * `
+                  -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+                  -property installationPath
+
+                if (-not $installationPath) {
+                  throw "Visual Studio installation was not found"
+                }
+
+                $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe"
+
+                & $installer modify `
+                  --installPath "$installationPath" `
+                  --add Microsoft.VisualStudio.Component.Windows11SDK.22000 `
+                  --quiet `
+                  --wait `
+                  --norestart
+
+                if ($LASTEXITCODE -ne 0) {
+                  throw "Windows SDK installation failed with exit code $LASTEXITCODE"
+                }
+
+                if (-not (Test-Path "C:\Program Files (x86)\Windows Kits\10\Lib\10.0.22000.0")) {
+                  throw "Windows SDK 10.0.22000.0 was not installed"
+                }
+
       - name: Build FiveM client
         shell: pwsh
         run: |
